@@ -2001,53 +2001,89 @@
 
                     if (progress >= 100) {
                         clearInterval(progressInterval);
-
-                        // 动态加载html2canvas库
-                        if (typeof html2canvas === 'undefined') {
-                            loadHtml2Canvas().then(() => {
-                                generateReportImage();
-                            });
-                        } else {
-                            generateReportImage();
-                        }
+                        generateReportImage();
                     }
                 }, 100);
             }
 
+            // 生成报告图片
+            function generateReportImage() {
+                // 检查是否已加载html2canvas库
+                if (typeof html2canvas === 'undefined') {
+                    loadHtml2Canvas().then(() => {
+                        captureAndSave();
+                    }).catch(() => {
+                        document.getElementById('image-loader-text').textContent = '加载库失败，请重试';
+                        setTimeout(() => {
+                            document.getElementById('image-loader').style.display = 'none';
+                        }, 2000);
+                    });
+                } else {
+                    captureAndSave();
+                }
+            }
+
             // 动态加载html2canvas
             function loadHtml2Canvas() {
-                return new Promise((resolve) => {
+                return new Promise((resolve, reject) => {
+                    // 检查是否已经加载过
+                    if (typeof html2canvas !== 'undefined') {
+                        resolve();
+                        return;
+                    }
+
                     const script = document.createElement('script');
-                    script.src = 'https://html2canvas.hertzen.com/dist/html2canvas.min.js';
+                    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
                     script.onload = resolve;
+                    script.onerror = reject;
                     document.head.appendChild(script);
                 });
             }
 
-            // 生成报告图片
-            function generateReportImage() {
-                html2canvas(document.getElementById('result-container'), {
-                    scale: 2,
-                    useCORS: true,
-                    logging: false
+            // 捕获并保存图像
+            function captureAndSave() {
+                const element = document.getElementById('result-container');
+
+                // 添加临时样式确保完整渲染
+                const originalOverflow = document.body.style.overflow;
+                document.body.style.overflow = 'hidden';
+
+                // 使用html2canvas捕获元素
+                html2canvas(element, {
+                    scale: 2, // 提高图像质量
+                    useCORS: true, // 允许跨域资源
+                    logging: false,
+                    backgroundColor: "#FFFFFF" // 确保背景为白色
                 }).then(canvas => {
-                    // 将canvas转换为图片
-                    const imgData = canvas.toDataURL('image/jpeg', 0.85);
+                    // 恢复原始样式
+                    document.body.style.overflow = originalOverflow;
 
-                    // 创建下载链接
-                    const link = document.createElement('a');
-                    link.download = `${currentPetType}性格报告_${new Date().getTime()}.jpg`;
-                    link.href = imgData;
+                    try {
+                        // 将canvas转换为图片
+                        const imgData = canvas.toDataURL('image/jpeg', 0.9);
 
-                    // 模拟点击下载
-                    document.body.appendChild(link);
-                    link.click();
-                    document.body.removeChild(link);
+                        // 创建下载链接
+                        const link = document.createElement('a');
+                        link.download = `${currentPetType || '宠物'}性格报告_${new Date().getTime()}.jpg`;
+                        link.href = imgData;
 
-                    // 隐藏加载指示器
-                    document.getElementById('image-loader').style.display = 'none';
+                        // 模拟点击下载
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+
+                        // 隐藏加载指示器
+                        document.getElementById('image-loader').style.display = 'none';
+                    } catch (e) {
+                        console.error('保存图片失败:', e);
+                        document.getElementById('image-loader-text').textContent = '保存失败，请重试';
+                        setTimeout(() => {
+                            document.getElementById('image-loader').style.display = 'none';
+                        }, 2000);
+                    }
                 }).catch(error => {
                     console.error('生成图片失败:', error);
+                    document.body.style.overflow = originalOverflow;
                     document.getElementById('image-loader-text').textContent = '生成失败，请重试';
                     setTimeout(() => {
                         document.getElementById('image-loader').style.display = 'none';
